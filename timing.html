@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0b0d" />
+<title>Live Timing · Six Hours of the Glen</title>
+<meta name="description" content="Live timing &amp; scoring for the Sahlen's Six Hours of the Glen, sourced from the IMSA / Al Kamel feed." />
+<style>
+  :root{
+    --bg:#0a0b0d; --panel:#111317; --panel2:#15181d; --line:#23272e;
+    --txt:#f2f3f5; --dim:#9aa0a8; --dim2:#7c828b;
+    --red:#E11A2C; --red-soft:#ff5566; --gold:#f5c542;
+    --gtp:#E11A2C; --lmp2:#3da9fc; --gtdpro:#c8a23c; --gtd:#36c08a;
+    --up:#36c08a; --down:#ff5566;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-text-size-adjust:100%}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  a{color:inherit;text-decoration:none}
+
+  header{position:sticky;top:0;z-index:30;background:rgba(10,11,13,.92);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;gap:12px;padding:10px 14px;max-width:1100px;margin:0 auto}
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);
+    padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  .back:active{background:var(--panel2)}
+  .ttl{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+  .ttl b{font-size:14px;font-weight:650;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ttl span{font-size:11px;color:var(--dim2);text-transform:uppercase;letter-spacing:1.2px}
+  .spacer{flex:1}
+  .conn{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);
+    font-family:var(--mono);padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--dim2);transition:background .3s}
+  .dot.live{background:var(--up);box-shadow:0 0 0 0 rgba(54,192,138,.6);animation:pulse 2s infinite}
+  .dot.err{background:var(--red)}
+  .dot.wait{background:var(--gold)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(54,192,138,.5)}70%{box-shadow:0 0 0 7px rgba(54,192,138,0)}100%{box-shadow:0 0 0 0 rgba(54,192,138,0)}}
+
+  .sub{max-width:1100px;margin:0 auto;padding:10px 14px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .clock{font-family:var(--mono);font-size:13px;color:var(--dim)}
+  .clock b{color:var(--txt)}
+  .flag{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:6px;
+    background:var(--panel);border:1px solid var(--line);color:var(--dim)}
+  .flag.green{color:#06160e;background:var(--up);border-color:transparent}
+  .flag.yellow{color:#1a1500;background:var(--gold);border-color:transparent}
+  .flag.red{color:#fff;background:var(--red);border-color:transparent}
+  .flag.checkered,.flag.finish{color:#0a0b0d;background:#e9ebef;border-color:transparent}
+
+  .filters{max-width:1100px;margin:0 auto;padding:10px 14px;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .chip{flex:0 0 auto;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--dim);
+    padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);cursor:pointer}
+  .chip[data-on="1"]{color:var(--txt);border-color:#3a3f47;background:var(--panel2)}
+  .chip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--dim2)}
+  .chip.gtp .sw{background:var(--gtp)} .chip.lmp2 .sw{background:var(--lmp2)}
+  .chip.gtdpro .sw{background:var(--gtdpro)} .chip.gtd .sw{background:var(--gtd)}
+
+  main{max-width:1100px;margin:0 auto;padding:0 8px 80px}
+
+  /* desktop table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:54px;z-index:10;background:#0d0f12;color:var(--dim2);
+    font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
+    text-align:right;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  thead th.l{text-align:left}
+  tbody td{padding:9px 8px;border-bottom:1px solid #181b20;text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  tbody td.l{text-align:left;font-family:var(--sans)}
+  tbody tr{transition:background .15s}
+  tbody tr:active{background:var(--panel2)}
+  .posbar{display:inline-block;width:3px;height:18px;border-radius:2px;margin-right:8px;vertical-align:middle;background:var(--dim2)}
+  tr[data-cls="GTP"] .posbar{background:var(--gtp)} tr[data-cls="LMP2"] .posbar{background:var(--lmp2)}
+  tr[data-cls="GTD PRO"] .posbar{background:var(--gtdpro)} tr[data-cls="GTD"] .posbar{background:var(--gtd)}
+  .num{font-weight:700}
+  .car{font-weight:700;color:var(--txt);min-width:34px;display:inline-block}
+  .drv{color:var(--txt);font-weight:600}
+  .team{color:var(--dim2);font-size:11px}
+  .mfg{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .clstag{font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:4px;color:#0a0b0d}
+  td .best{color:var(--gold)}
+  td .pit{color:var(--red-soft);font-weight:700}
+  .move{font-family:var(--mono);font-size:11px;min-width:20px;display:inline-block}
+  .move.up{color:var(--up)} .move.down{color:var(--down)}
+  .flash{animation:flash 1s ease}
+  @keyframes flash{0%{background:rgba(245,197,66,.18)}100%{background:transparent}}
+
+  /* mobile cards */
+  .cards{display:none}
+  @media(max-width:680px){
+    table{display:none}
+    .cards{display:block}
+    thead th{top:0}
+    .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+      padding:11px 10px;border-bottom:1px solid #181b20}
+    .row:active{background:var(--panel2)}
+    .pos{display:flex;align-items:center;gap:8px;min-width:54px}
+    .pos .p{font-size:20px;font-weight:800;font-family:var(--mono);min-width:26px;text-align:center}
+    .pos .cp{font-size:11px;color:var(--dim2);font-family:var(--mono)}
+    .mid{min-width:0}
+    .mid .top{display:flex;align-items:center;gap:7px}
+    .mid .drv2{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mid .meta{font-size:11px;color:var(--dim2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .right{text-align:right;font-family:var(--mono);min-width:78px}
+    .right .gap{font-size:14px;font-weight:650}
+    .right .ll{font-size:11px;color:var(--dim);margin-top:2px}
+    .right .ll.best{color:var(--gold)}
+    .right .ll.pit{color:var(--red-soft);font-weight:700}
+  }
+
+  .empty{padding:48px 20px;text-align:center;color:var(--dim)}
+  .empty h2{font-size:16px;color:var(--txt);margin:0 0 8px;font-weight:600}
+  .empty p{font-size:13px;line-height:1.6;margin:4px 0;max-width:440px;display:inline-block}
+  .empty .sched{margin-top:18px;display:inline-block;font-size:13px;color:var(--red-soft);
+    border:1px solid var(--line);border-radius:8px;padding:9px 16px;background:var(--panel)}
+  .spin{width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--red);border-radius:50%;
+    animation:spin 1s linear infinite;margin:0 auto 16px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* debug drawer */
+  .dbgtab{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:40;
+    font-family:var(--mono);font-size:11px;color:var(--dim);background:var(--panel);
+    border:1px solid var(--line);border-radius:999px;padding:8px 13px;cursor:pointer}
+  .dbg{position:fixed;inset:auto 0 0 0;z-index:45;max-height:70vh;background:#0c0e11;
+    border-top:1px solid var(--line);transform:translateY(100%);transition:transform .25s;display:flex;flex-direction:column}
+  .dbg[data-open="1"]{transform:translateY(0)}
+  .dbg .dh{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .dbg .dh b{font-size:12px;letter-spacing:.4px}
+  .dbg .dh .x{margin-left:auto;color:var(--dim);cursor:pointer;font-size:18px;padding:0 6px}
+  .dbg pre{margin:0;padding:10px 14px;overflow:auto;font-family:var(--mono);font-size:11px;line-height:1.5;color:#c9d1d9}
+  .dbg .meta{font-size:11px;color:var(--dim2);padding:0 14px 10px}
+  .pillrow{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+  .pill{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:3px 7px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="back" href="./index.html">&larr; Schedule</a>
+    <div class="ttl">
+      <b id="sessName">Live Timing</b>
+      <span id="sessKind">Sahlen's Six Hours of the Glen</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="conn"><span class="dot" id="dot"></span><span id="connTxt">connecting</span></div>
+  </div>
+  <div class="sub">
+    <span class="flag" id="flag">—</span>
+    <span class="clock">Session <b id="sClock">--:--:--</b></span>
+    <span class="clock">Remaining <b id="rClock">--:--:--</b></span>
+  </div>
+  <div class="filters" id="filters">
+    <div class="chip" data-on="1" data-cls="ALL">All</div>
+    <div class="chip gtp" data-cls="GTP"><span class="sw"></span>GTP</div>
+    <div class="chip lmp2" data-cls="LMP2"><span class="sw"></span>LMP2</div>
+    <div class="chip gtdpro" data-cls="GTD PRO"><span class="sw"></span>GTD PRO</div>
+    <div class="chip gtd" data-cls="GTD"><span class="sw"></span>GTD</div>
+  </div>
+</header>
+
+<main>
+  <table id="tbl">
+    <thead><tr>
+      <th class="l">Pos</th><th class="l">Cls</th><th class="l">#</th><th class="l">Driver / Team</th>
+      <th>Mfg</th><th>Laps</th><th>Gap</th><th>Int</th><th>Last</th><th>Best</th><th>Pits</th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="empty">
+    <div class="spin" id="spin"></div>
+    <h2 id="emptyH">Connecting to the timing feed…</h2>
+    <p id="emptyP">Establishing the live link to IMSA / Al Kamel scoring.</p>
+    <a class="sched" href="./index.html">View the weekend schedule →</a>
+  </div>
+</main>
+
+<div class="dbgtab" id="dbgtab">⛭ feed</div>
+<div class="dbg" id="dbg">
+  <div class="dh"><b>Raw feed inspector</b>
+    <span class="meta" id="dbgStat" style="padding:0"></span>
+    <span class="x" id="dbgX">✕</span></div>
+  <div class="pillrow" id="dbgCols"></div>
+  <div class="meta">Latest standings document (verifies field mapping on a live session):</div>
+  <pre id="dbgPre">No documents received yet.</pre>
+</div>
+
+<script>
+/* ───────────────────────── Al Kamel DDP / SockJS live-timing client ─────────────────────────
+   The IMSA scoring app (livetiming.alkamelsystems.com, "LT2") is a Meteor app. Live data is
+   delivered over DDP-on-SockJS, NOT a REST/JSON endpoint. Flow:
+     1. open  wss://livetiming.alkamelsystems.com/sockjs/<srv>/<sess>/websocket
+     2. send  {"msg":"connect","version":"1","support":["1"]}
+     3. sub   "feedsPublicsAndRunning"  -> collection "feeds" lists running events;
+              the IMSA event is name:"imsa" with a sessions[] array of ObjectIds.
+     4. sub   "sessionInfo",[sessionIds]  and  "standings", <feedId|sessionId>
+   Verified live: host, handshake, feeds list, IMSA feed id, sub acceptance. The standings
+   ROW schema is mapped below against Al Kamel conventions and normalized defensively — open the
+   "⛭ feed" drawer during a live session to confirm/auto-learn exact field names.            */
+
+const HOST = "livetiming.alkamelsystems.com";
+const FEED_NAME = "imsa";
+const els = id => document.getElementById(id);
+const rid = () => Array.from({length:17},()=>"abcdefghijklmnopqrstuvwxyz0123456789"[Math.random()*36|0]).join("");
+const enc = o => JSON.stringify([JSON.stringify(o)]);
+
+const state = {
+  feedId:null, sessions:[], collections:{}, entries:{}, standings:{}, session:{},
+  prevPos:{}, filter:"ALL", lastDoc:null, status:"connecting"
+};
+
+/* ── connection ── */
+let ws=null, retry=0, hbTimer=null;
+function setConn(s,txt){ state.status=s;
+  const d=els("dot"); d.className="dot"+(s==="live"?" live":s==="error"?" err":s==="waiting"?" wait":"");
+  els("connTxt").textContent=txt; els("dbgStat").textContent=txt;
+}
+function connect(){
+  setConn("connecting","connecting");
+  const url=`wss://${HOST}/sockjs/${(Math.random()*900+100|0)}/${rid().slice(0,8)}/websocket`;
+  try{ ws=new WebSocket(url); }catch(e){ return scheduleRetry(); }
+  ws.onopen=()=>{ ws.send(enc({msg:"connect",version:"1",support:["1","pre2","pre1"]})); };
+  ws.onmessage=onMsg;
+  ws.onerror=()=>{ setConn("error","link error"); };
+  ws.onclose=()=>{ clearInterval(hbTimer); setConn("error","reconnecting"); scheduleRetry(); };
+}
+function scheduleRetry(){ retry=Math.min(retry+1,6); setTimeout(connect, 800*Math.pow(1.6,retry)); }
+
+function send(o){ if(ws&&ws.readyState===1) ws.send(enc(o)); }
+function sub(name,params){ send({msg:"sub",id:rid(),name,params:params||[]}); }
+
+function onMsg(ev){
+  const data=ev.data; if(!data) return;
+  const t=data[0];
+  if(t==="o"){ return; }                       // SockJS open
+  if(t==="h"){ return; }                        // heartbeat
+  if(t==="c"){ return; }                        // close
+  if(t!=="a") return;                           // we only care about array frames
+  let arr; try{ arr=JSON.parse(data.slice(1)); }catch{ return; }
+  for(const inner of arr){
+    let o; try{ o=JSON.parse(inner); }catch{ continue; }
+    handle(o);
+  }
+}
+
+function handle(o){
+  switch(o.msg){
+    case "connected":
+      retry=0;
+      hbTimer=setInterval(()=>send({msg:"ping"}),20000);
+      sub("feedsPublicsAndRunning");
+      setConn("waiting","finding event");
+      break;
+    case "ping": send({msg:"pong"}); break;
+    case "ready": break;
+    case "nosub": break;
+    case "added":
+    case "changed":
+      applyDoc(o.collection,o.id,o.fields||{},o.msg);
+      break;
+    case "removed":
+      if(state.collections[o.collection]) delete state.collections[o.collection][o.id];
+      if(o.collection==="standings"){ delete state.standings[o.id]; render(); }
+      break;
+  }
+}
+
+function applyDoc(col,id,fields,msg){
+  (state.collections[col]=state.collections[col]||{});
+  const cur=state.collections[col][id]=Object.assign(state.collections[col][id]||{},fields);
+
+  if(col==="feeds"){
+    // locate the IMSA event and its sessions
+    if((cur.name||"").toLowerCase()===FEED_NAME){
+      state.feedId=id;
+      state.sessions=(cur.sessions||[]).map(s=>s&&s.$value?s.$value:s).filter(Boolean);
+      if(!state._subSession){
+        state._subSession=true;
+        sub("sessionInfo",[state.sessions]);
+        sub("standings",[state.feedId]);
+        // also try sessionId form, harmless if it nosubs
+        if(state.sessions.length) sub("standings",[state.sessions[state.sessions.length-1]]);
+        setConn("waiting","awaiting session");
+      }
+    }
+    return;
+  }
+  if(col==="sessionInfo"||col==="sessions"||col==="session"){
+    Object.assign(state.session,normSession(cur));
+    paintSession(); return;
+  }
+  if(col==="entries"||col==="competitors"){
+    state.entries[id]=cur; return;
+  }
+  if(col==="standings"||col==="results"||col==="classification"||col==="timing"){
+    state.standings[id]=cur;
+    state.lastDoc={collection:col,id,fields:cur};
+    learnCols(cur);
+    setConn("live","live");
+    render();
+  }
+}
+
+/* ── defensive field normalization (Al Kamel naming varies by series/season) ── */
+const pick=(o,...k)=>{ for(const x of k){ if(o[x]!=null&&o[x]!=="") return o[x]; } return undefined; };
+function normSession(s){
+  return {
+    name: pick(s,"name","sessionName","title","session"),
+    kind: pick(s,"type","sessionType","category"),
+    flag: pick(s,"flag","trackStatus","status","raceState"),
+    elapsed: pick(s,"elapsed","sessionTime","timeElapsed","clock"),
+    remaining: pick(s,"remaining","timeRemaining","timeToGo","remain")
+  };
+}
+function normRow(r){
+  const cls=(pick(r,"class","category","cls","classN","group")||"").toString().toUpperCase().trim();
+  const clsNorm = cls.includes("PRO")&&cls.includes("GTD")?"GTD PRO"
+                : cls.startsWith("GTP")||cls.includes("HYPERCAR")?"GTP"
+                : cls.startsWith("LMP2")||cls==="P2"?"LMP2"
+                : cls.startsWith("GTD")?"GTD" : cls;
+  return {
+    pos:   num(pick(r,"position","pos","rank","overallPosition","p")),
+    cpos:  num(pick(r,"classPosition","posInClass","classPos","cPos","categoryPosition")),
+    num:   (pick(r,"number","carNumber","num","raceNumber","no")||"").toString(),
+    cls:   clsNorm,
+    driver:pick(r,"driver","currentDriver","driverName","pilot","name")||"",
+    team:  pick(r,"team","teamName","entrant","entry")||"",
+    mfg:   pick(r,"manufacturer","mfg","make","brand","car","vehicle")||"",
+    laps:  num(pick(r,"laps","lapsCompleted","lap","completedLaps","nbLaps")),
+    gap:   fmtGap(pick(r,"gap","behindLeader","gapToLeader","behindOverall","timeBehindLeader")),
+    int:   fmtGap(pick(r,"interval","gapToNext","behindNext","behindNextInClass","int")),
+    last:  fmtLap(pick(r,"lastLap","lastLapTime","lastTime","last","lapTime")),
+    best:  fmtLap(pick(r,"bestLap","bestLapTime","fastestLap","best","bestTime")),
+    isBest:!!pick(r,"lastIsBest","isFastest","purple"),
+    pit:   isTrue(pick(r,"inPit","pit","pitStop","inPitLane","box")),
+    pits:  num(pick(r,"pitStops","pits","nbPitStops","stops")),
+    key:   (pick(r,"number","carNumber","num")||pick(r,"id"))+""
+  };
+}
+const num=v=>{ const n=parseInt(v,10); return isNaN(n)?null:n; };
+const isTrue=v=>v===true||v===1||v==="1"||v==="true"||v==="yes";
+function fmtLap(v){ if(v==null||v==="") return null;
+  if(typeof v==="number"){ // ms or s
+    let s=v>3000?v/1000:v; const m=Math.floor(s/60), r=(s-m*60);
+    return (m>0?m+":":"")+r.toFixed(3).padStart(m>0?6:5,"0"); }
+  return String(v); }
+function fmtGap(v){ if(v==null||v==="") return null;
+  if(typeof v==="number"){ if(Math.abs(v)>=10000) return null; return (v>0?"+":"")+v.toFixed(3); }
+  let s=String(v); if(/lap/i.test(s)) return s.replace(/laps?/i,m=>m); return s.startsWith("+")||s.startsWith("-")?s:("+"+s); }
+
+/* ── learn columns for the debug drawer ── */
+function learnCols(doc){
+  const keys=Object.keys(doc);
+  els("dbgCols").innerHTML=keys.map(k=>`<span class="pill">${k}</span>`).join("");
+  els("dbgPre").textContent=JSON.stringify(doc,null,2);
+}
+
+/* ── session header paint ── */
+function paintSession(){
+  const s=state.session;
+  if(s.name) els("sessName").textContent=s.name;
+  if(s.kind) els("sessKind").textContent=s.kind;
+  const f=(s.flag||"").toString().toLowerCase();
+  const fl=els("flag"); fl.className="flag";
+  let label="—";
+  if(/green|gflag|track.?clear/.test(f)){fl.classList.add("green");label="Green";}
+  else if(/yellow|fcy|caution|sc|vsc/.test(f)){fl.classList.add("yellow");label=/vsc/.test(f)?"VSC":/full|fcy/.test(f)?"FCY":"Yellow";}
+  else if(/red/.test(f)){fl.classList.add("red");label="Red";}
+  else if(/check|finish/.test(f)){fl.classList.add("checkered");label="Checkered";}
+  else if(s.flag){label=s.flag;}
+  fl.textContent=label;
+  if(s.elapsed) els("sClock").textContent=fmtClock(s.elapsed);
+  if(s.remaining) els("rClock").textContent=fmtClock(s.remaining);
+}
+function fmtClock(v){ if(v==null) return "--:--:--";
+  if(typeof v==="number"){ let s=v>100000?Math.floor(v/1000):v;
+    const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=Math.floor(s%60);
+    return [h,m,x].map(n=>String(n).padStart(2,"0")).join(":"); }
+  return String(v); }
+
+/* ── render standings ── */
+function render(){
+  const rows=Object.values(state.standings).map(normRow)
+    .filter(r=>r.pos!=null||r.num)
+    .sort((a,b)=>(a.pos??999)-(b.pos??999));
+  const list = state.filter==="ALL"?rows:rows.filter(r=>r.cls===state.filter);
+
+  if(!list.length){ showEmptyLive(); return; }
+  els("empty").style.display="none";
+
+  // desktop
+  els("tb").innerHTML=list.map(r=>rowHTML(r)).join("");
+  // mobile
+  els("cards").innerHTML=list.map(r=>cardHTML(r)).join("");
+
+  // movement memory
+  const np={}; list.forEach(r=>np[r.key]=r.pos); 
+  for(const k in np){ const was=state.prevPos[k];
+    if(was!=null&&np[k]!=null&&was!==np[k]){ flash(k); } }
+  state.prevPos=np;
+}
+function moveHTML(r){ const was=state.prevPos[r.key];
+  if(was==null||r.pos==null||was===r.pos) return `<span class="move"></span>`;
+  const up=r.pos<was; return `<span class="move ${up?"up":"down"}">${up?"▲":"▼"}${Math.abs(was-r.pos)}</span>`; }
+function clsTag(c){ const col={ "GTP":"var(--gtp)","LMP2":"var(--lmp2)","GTD PRO":"var(--gtdpro)","GTD":"var(--gtd)" }[c]||"var(--dim2)";
+  return `<span class="clstag" style="background:${col}">${c||"—"}</span>`; }
+function rowHTML(r){
+  return `<tr data-cls="${r.cls}" data-k="${r.key}">
+    <td class="l"><span class="posbar"></span><span class="num">${r.pos??"–"}</span> ${moveHTML(r)}</td>
+    <td class="l">${clsTag(r.cls)} <span style="color:var(--dim2)">${r.cpos??""}</span></td>
+    <td class="l"><span class="car">#${r.num}</span></td>
+    <td class="l"><span class="drv">${r.driver||"—"}</span><div class="team">${r.team||""}</div></td>
+    <td class="mfg">${r.mfg||""}</td>
+    <td>${r.laps??""}</td>
+    <td>${r.gap||(r.pos===1?"Leader":"")}</td>
+    <td>${r.int||""}</td>
+    <td class="${r.pit?"pit":""}">${r.pit?"PIT":(r.last||"")}</td>
+    <td class="${r.isBest?"best":""}">${r.best||""}</td>
+    <td>${r.pits??""}</td>
+  </tr>`;
+}
+function cardHTML(r){
+  const right = r.pit
+    ? `<div class="gap" style="color:var(--red-soft)">PIT</div><div class="ll pit">stop ${r.pits??""}</div>`
+    : `<div class="gap">${r.pos===1?"Leader":(r.gap||"")}</div><div class="ll ${r.isBest?"best":""}">${r.last||r.best||""}</div>`;
+  return `<div class="row" data-cls="${r.cls}" data-k="${r.key}">
+    <div class="pos"><span class="posbar"></span><span class="p">${r.pos??"–"}</span>
+      <span class="cp">${r.cls?r.cls+" "+(r.cpos??""):""}</span></div>
+    <div class="mid">
+      <div class="top"><span class="drv2">#${r.num} ${r.driver||"—"}</span> ${moveHTML(r)}</div>
+      <div class="meta">${[r.team,r.mfg].filter(Boolean).join(" · ")}</div>
+    </div>
+    <div class="right">${right}</div>
+  </div>`;
+}
+function flash(key){
+  document.querySelectorAll(`[data-k="${CSS.escape(key)}"]`).forEach(el=>{
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); });
+}
+
+/* ── empty states ── */
+function showEmptyLive(){
+  els("tb").innerHTML=""; els("cards").innerHTML="";
+  const e=els("empty"); e.style.display="block";
+  els("spin").style.display = (state.status==="live"||state.status==="waiting")?"none":"block";
+  if(state.status==="live"||state.status==="waiting"){
+    els("emptyH").textContent="No cars on track right now";
+    els("emptyP").innerHTML="The feed is connected, but no IMSA session is currently being timed. "
+      +"Timing will populate automatically when the next practice, qualifying, or race session goes green.";
+  }else{
+    els("emptyH").textContent="Connecting to the timing feed…";
+    els("emptyP").textContent="Establishing the live link to IMSA / Al Kamel scoring.";
+  }
+}
+
+/* ── filters ── */
+els("filters").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return;
+  state.filter=c.dataset.cls;
+  document.querySelectorAll("#filters .chip").forEach(x=>x.dataset.on=x===c?"1":"0");
+  render();
+});
+
+/* ── debug drawer ── */
+els("dbgtab").onclick=()=>els("dbg").dataset.open="1";
+els("dbgX").onclick=()=>els("dbg").dataset.open="0";
+
+/* ── boot ── */
+connect();
+showEmptyLive();
+// keep clocks ticking smoothly between feed updates is left to feed cadence
+</script>
+</body>
+</html>
